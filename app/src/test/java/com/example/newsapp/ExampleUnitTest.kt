@@ -25,18 +25,40 @@ import retrofit2.Response
 class ExampleUnitTest {
 
 
-
     @Test
     fun addition_isCorrect() {
         assertEquals(4, 2 + 2)
     }
 
 
-
     @Test
-    fun addition_isCorrecat() = runBlocking{
-        val result = provideNewsApi().getArticlesFromTopic("bitcoin")
-        assertEquals(result.isSuccessful, true)
+    fun findLongestSubsequence() {
+        // Write your code here
+        val arr = arrayOf(4,
+            1,
+            3,
+            5,
+            7)
+        val sortedArr = arr.sorted().toMutableList()
+        sortedArr.removeAt(0)
+        val differencesList = mutableListOf<Int>()
+        var difference = 0
+
+        for (i in sortedArr.withIndex()) {
+            if ((i.index + 1) < sortedArr.size) {
+                difference = sortedArr[i.index + 1] - i.value
+                differencesList.add(difference)
+            }
+
+        }
+        val result = differencesList.sumOf { it }
+
+        println(sortedArr)
+        println(differencesList)
+
+
+        println(result)
+        assertEquals( 4 ,result)
     }
 
 }

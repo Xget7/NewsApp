@@ -23,12 +23,24 @@ class NewsViewModel @Inject constructor(
 
     private val recentNews: Flow<MutableList<Article>> = emptyFlow()
 
-    val _uiState = MutableStateFlow(NewsUiState(isLoading = true))
+    private val _uiState = MutableStateFlow(NewsUiState(isLoading = true))
     val uiState: StateFlow<NewsUiState> = _uiState.asStateFlow()
 
 
     init {
-        getNews()
+        if (repo.hasInternetConnection()){
+            getNews()
+        }else{
+            _uiState.update {
+                it.copy(
+                    isSuccessNews = false,
+                    isLoading = false,
+                    newsList = mutableListOf(),
+                    isError = "No internet connection 💔"
+                )
+            }
+        }
+
     }
 
     private fun getNews() {
@@ -41,7 +53,7 @@ class NewsViewModel @Inject constructor(
                         it.copy(
                             isSuccessNews = false,
                             isLoading = false,
-                            newsList = emptyList(),
+                            newsList = mutableListOf(),
                             isError = msg.localizedMessage
                         )
                     }
@@ -51,14 +63,21 @@ class NewsViewModel @Inject constructor(
                         it.copy(
                             isSuccessNews = true,
                             isLoading = false,
-                            newsList = news,
+                            newsList = news.toMutableList(),
                             isError = null
                         )
                     }
                 }
         }
     }
+    fun saveArticle(index : Int,article: Article){
+        viewModelScope.launch {
+            article.favorite = true
+            repo.saveArticle(article)
+            _uiState.value.newsList[index] = article
+        }
 
+    }
     private fun setLoading(){
         _uiState.update {
             it.copy(
@@ -66,14 +85,4 @@ class NewsViewModel @Inject constructor(
             )
         }
     }
-
-
-
-//    .catch {
-//        it.localizedMessage?.let { it1 -> NewsUiState.Error(it1) }
-//    }.collect{ news ->
-//        recentNews.map {
-//            it.addAll(news)
-//        }
-//    }
 }

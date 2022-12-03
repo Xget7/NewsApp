@@ -4,7 +4,11 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.provider.ContactsContract
 import android.support.annotation.ColorRes
+import android.view.ViewGroup
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,18 +28,25 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardColors
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CardElevation
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -48,6 +59,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.navigation.NavController
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import coil.compose.SubcomposeAsyncImage
@@ -57,17 +73,30 @@ import coil.request.ImageRequest
 import com.example.newsapp.R
 import com.example.newsapp.data.models.Article
 import com.example.newsapp.data.models.Source
+import com.example.newsapp.util.Routes
+import com.squareup.okhttp.Route
+import me.saket.swipe.SwipeAction
+import me.saket.swipe.SwipeableActionsBox
 
 
 @Composable
 fun NewsCard(
     article: Article,
-    onClick : () -> Unit
+    onClick: () -> Unit,
+    onFav: () -> Unit,
 ) {
+    val rememberFav = remember {
+        mutableStateOf(false)
+    }
 
-    Column(modifier = Modifier.fillMaxWidth().clickable {
-        onClick()
-    }, horizontalAlignment = Alignment.CenterHorizontally) {
+
+    Column(
+        modifier = Modifier
+            .wrapContentWidth()
+            .clickable {
+                onClick()
+            }, horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         Card(
             modifier = Modifier
                 .width(320.dp)
@@ -79,34 +108,59 @@ fun NewsCard(
             Column(
                 horizontalAlignment = Alignment.Start,
             ) {
-
                 SubcomposeAsyncImage(
                     model = article.urlToImage,
                     contentDescription = "desc"
                 ) {
-                    val state = painter.state
-                    if (state is AsyncImagePainter.State.Loading || state is AsyncImagePainter.State.Error) {
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            CircularProgressIndicator()
+                    when (painter.state) {
+
+                        AsyncImagePainter.State.Empty -> TODO()
+                        is AsyncImagePainter.State.Loading -> {
+                            LoadingComponent()
                         }
-                    } else {
-                        SubcomposeAsyncImageContent()
+
+                        is AsyncImagePainter.State.Success -> {
+                            SubcomposeAsyncImageContent()
+                        }
+
+                        is AsyncImagePainter.State.Error -> {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(text = "Error Loading Photo", fontSize = 32.sp)
+                            }
+                        }
+
+                        else -> {}
                     }
+
+
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = article.title,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Start,
-                    modifier = Modifier
-                        .width(240.dp)
-                        .padding(start = 12.dp, end = 12.dp)
-                )
+                Row(
+                ) {
+                    Text(
+                        text = article.title!!,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Start,
+                        modifier = Modifier
+                            .width(260.dp)
+                            .padding(start = 12.dp, end = 12.dp)
+                    )
+                    IconButton(onClick = {
+                        onFav()
+                    }) {
+                        Icon(
+                            imageVector = Icons.Outlined.Favorite,
+                            tint = if (!article.favorite) Color.LightGray else Color.Red,
+                            contentDescription = "Fav",
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
@@ -125,46 +179,136 @@ fun NewsCard(
 
         }
     }
+//    }
+
 
 }
 
 
 @Composable
-fun NewsFeed(
+fun FavNewsFeed(
     newsList: List<Article>,
     lazyListState: LazyListState,
+    onFav: (Article) -> Unit,
+    onUnFav: (Article) -> Unit,
+    navController: NavHostController
 
 ) {
 
-    val context = LocalContext.current
+
     LazyColumn(
         state = lazyListState
     ) {
-
         items(newsList) {
             Spacer(modifier = Modifier.height(8.dp))
-            NewsCard(article = it){
-                context.startActivity(openWebNew(it.url))
+            val unFav = SwipeAction(
+                icon = painterResource(R.drawable.trash),
+                background = Color.Transparent,
+                onSwipe = { onUnFav(it) }
+            )
+            SwipeableActionsBox(
+                backgroundUntilSwipeThreshold = Color.Transparent,
+                startActions = listOf(unFav)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    NewsCard(article = it, {
+                        navController.navigate("webViewNews/{${it.url}}")
+                    }, {
+                        onFav(it)
+                    })
+                }
+
             }
         }
     }
 
 }
 
-fun openWebNew(url : String) : Intent{
-    val uris = Uri.parse(url)
-    val intents = Intent(Intent.ACTION_VIEW, uris)
-    val b = Bundle()
-    b.putBoolean("new_window", true)
-    return intents.putExtras(b)
+@Composable
+fun NewsFeed(
+    newsList: List<Article>,
+    lazyListState: LazyListState,
+    onFav: (Int, Article) -> Unit,
+    navController: NavHostController
+) {
+
+    LazyColumn(
+        state = lazyListState
+    ) {
+        itemsIndexed(newsList) { index, article ->
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                NewsCard(article = article, {
+                    navController.navigate(Routes.WebViewNews.route + "?url=${article.url}")
+                }, {
+                    onFav(index, article)
+                })
+            }
+        }
+    }
+
 }
 
+
+@Composable
+fun ShimmerNewsFeed() {
+
+    LazyColumn(
+    ) {
+        items(5) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                ShimmerAnimation()
+            }
+
+        }
+    }
+
+}
+
+
+@Composable
+fun WebViewPage(url: String, navController: NavController) {
+    AndroidView(factory = {
+        WebView(it).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            webViewClient = WebViewClient()
+            loadUrl(url)
+        }
+    }, update = {
+        it.loadUrl(url)
+    })
+}
+
+@Composable
+fun LoadingComponent() {
+    Row(
+        Modifier.fillMaxSize(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        CircularProgressIndicator(color = Color.White)
+    }
+}
 
 @Preview
 @Composable
 fun PreviewNewsCard() {
     val fakeArt =
         Article(
+            id = 2,
+            false,
             "Jose ESpirito",
             "lorem ipsum asjkdjkalskd ",
             "no se una descriptsion osea y para ser una descripcsion la idea es uq sea sau-per hamplica no cordino ni un dado ",
@@ -183,11 +327,14 @@ fun PreviewNewsCard() {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            NewsCard(article = fakeArt){
+            NewsCard(article = fakeArt, {
 
-            }
+            }, {
+
+            })
 
         }
     }
 
 }
+

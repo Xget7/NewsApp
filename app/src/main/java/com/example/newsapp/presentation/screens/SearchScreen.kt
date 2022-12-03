@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.CircularProgressIndicator
@@ -33,9 +34,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
 import com.example.newsapp.presentation.ui.components.CustomDialog
+import com.example.newsapp.presentation.ui.components.LoadingComponent
 import com.example.newsapp.presentation.ui.components.NewsFeed
 import com.example.newsapp.presentation.ui.components.SearchAppBar
+import com.example.newsapp.presentation.ui.components.ShimmerNewsFeed
 import com.example.newsapp.presentation.vm.searchNews.SearchNewsUiState
 import com.example.newsapp.presentation.vm.searchNews.SearchNewsViewModel
 
@@ -51,6 +55,8 @@ fun SearchScreen(
     selectedFilter: String,
     onOptionSelected: (String) -> Unit,
     showDialog: MutableState<Boolean>,
+    navHostController: NavHostController,
+    scrolledToEnd: () -> Unit,
 ) {
     if (showDialog.value) {
         CustomDialog(
@@ -59,14 +65,38 @@ fun SearchScreen(
             selectedOption = selectedFilter
         )
     }
-
     if (uiState.isLoading) {
-        Row(
-            Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            CircularProgressIndicator(color = Color.White)
+        Box(modifier = Modifier.background(Color(0xFF5c46bd))) {
+            Scaffold(modifier = Modifier
+                .padding(top = 20.dp)
+                .fillMaxSize()
+                .background(Color(0xFF5c46bd)), topBar = {
+                Row() {
+                    SearchAppBar(
+                        query = query,
+                        onQueryChanged = onQueryChanged,
+                        onExecuteSearch = {
+                            onExecuteSearch.invoke()
+                        },
+                        onOpenMenu = {
+                            Log.d("openMenu , Value: ", showDialog.value.toString() )
+                            showDialog.value = true
+                        }
+                    )
+
+                }
+
+            }) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFF5c46bd))
+                ) {
+                    Spacer(modifier = Modifier.height(74.dp))
+                    ShimmerNewsFeed()
+                }
+
+            }
         }
     } else if (uiState.isSuccessNews) {
         Box(modifier = Modifier.background(Color(0xFF5c46bd))) {
@@ -95,16 +125,19 @@ fun SearchScreen(
                         .fillMaxSize()
                         .background(Color(0xFF5c46bd))
                 ) {
-                    Spacer(modifier = Modifier.height(74.dp))
-                    NewsFeed(newsList = uiState.newsList, lazyListState = uiState.lazyState)
 
+                    Spacer(modifier = Modifier.height(74.dp))
+                    NewsFeed(newsList = uiState.newsList, lazyListState = uiState.lazyState, { index , article -> }, navHostController )
+                    if (uiState.lazyState.isScrolledToTheEnd()){
+                        scrolledToEnd()
+                    }
                 }
 
             }
         }
 
     } else if (uiState.isError != null) {
-        Text("Error ${uiState.isError}", fontSize = 32.sp, color = Color.Red)
+        ErrorHandle(uiState.isError!!)
     } else {
         Box(modifier = Modifier.background(Color(0xFF5c46bd))) {
             Scaffold(modifier = Modifier
@@ -115,7 +148,7 @@ fun SearchScreen(
                     query = query,
                     onQueryChanged = onQueryChanged,
                     onExecuteSearch = {
-                    onExecuteSearch.invoke()
+                    onExecuteSearch()
                     },
                     onOpenMenu = {
                         showDialog.value = true
@@ -148,9 +181,11 @@ fun SearchScreen(
 }
 
 
+
 @Composable
 fun SearchScreen(
-    viewModel: SearchNewsViewModel = viewModel()
+    viewModel: SearchNewsViewModel = viewModel(),
+    navHostController: NavHostController
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val query = viewModel.searchQuery.value
@@ -163,6 +198,9 @@ fun SearchScreen(
         viewModel::searchNewsByTopic,
         selectedFilter,
         viewModel::onFilterChanged,
-        viewModel.showDialog
-    )
+        viewModel.showDialog,
+        navHostController
+    ) { viewModel.lazyStateScrolledToEnd() }
 }
+
+fun LazyListState.isScrolledToTheEnd() = layoutInfo.visibleItemsInfo.lastOrNull()?.index == layoutInfo.totalItemsCount - 1

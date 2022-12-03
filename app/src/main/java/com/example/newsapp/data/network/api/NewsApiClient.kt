@@ -1,4 +1,4 @@
-package com.example.newsapp.data.network
+package com.example.newsapp.data.network.api
 
 import com.example.newsapp.data.network.interfaces.NewsInterface
 import com.squareup.okhttp.HttpUrl
@@ -15,7 +15,6 @@ object NewsApiClient {
        Retrofit.Builder()
            .baseUrl(BASE_URL)
            .addConverterFactory(GsonConverterFactory.create())
-           //addCallAdapterFactory(RxJava2CallAdapterFactory.createWithScheduler(Schedulers.io()))
            .build()
            .create(NewsInterface::class.java)
    }

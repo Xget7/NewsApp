@@ -1,5 +1,6 @@
 package com.example.newsapp.presentation.vm.searchNews
 
+import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -28,16 +29,20 @@ class SearchNewsViewModel @Inject constructor(
 
 
 
+
     val _uiState = MutableStateFlow(SearchNewsUiState())
     val uiState: StateFlow<SearchNewsUiState> = _uiState.asStateFlow()
+
 
     val showDialog = mutableStateOf(false)
     val searchQuery = mutableStateOf("")
     val selectedOption = mutableStateOf("publishedAt")
+    private val newsPage = mutableStateOf(1)
 
 
 
     init {
+
         savedStateHandle.get<String>(STATE_KEY_QUERY)?.let { q ->
             setQuery(q)
         }
@@ -45,7 +50,26 @@ class SearchNewsViewModel @Inject constructor(
             setQuery(q)
         }
 
+        if (!repo.hasInternetConnection()){
+            _uiState.update {
+                it.copy(
+                    isSuccessNews = false,
+                    isLoading = false,
+                    newsList = mutableListOf(),
+                    isError = "No internet connection 💔"
+                )
+            }
+        }
+
     }
+
+    fun lazyStateScrolledToEnd(){
+        newsPage.value += 1
+        addNewsToList()
+    }
+
+
+
     fun onQueryChanged(query: String) {
         setQuery(query)
     }
@@ -64,9 +88,39 @@ class SearchNewsViewModel @Inject constructor(
     }
 
 
-    fun searchNewsByTopic(){
+    private fun addNewsToList(){
+        val oldList =  _uiState.value.newsList.toMutableList()
         viewModelScope.launch {
-            repo.getArticlesFromTopic(searchQuery.value,selectedOption.value )
+            repo.getArticlesFromTopic(searchQuery.value,selectedOption.value , newsPage.value.toString() )
+                .catch { msg ->
+                    _uiState.update {
+                        it.copy(
+                            isSuccessNews = false,
+                            isLoading = false,
+                            newsList = emptyList(),
+                            isError = msg.localizedMessage
+                        )
+                    }
+                }
+                .collect { news ->
+                    oldList.addAll(news)
+                    _uiState.update {
+                        it.copy(
+                            isSuccessNews = true,
+                            isLoading = false,
+                            newsList = oldList,
+                            isError = null
+                        )
+                    }
+                }
+        }
+    }
+
+
+    fun searchNewsByTopic(){
+        Log.d("com.example.newsapp", "searchNewsByTocpic")
+        viewModelScope.launch {
+            repo.getArticlesFromTopic(searchQuery.value,selectedOption.value, "1")
                 .catch { msg ->
                     _uiState.update {
                         it.copy(

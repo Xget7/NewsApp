@@ -32,7 +32,7 @@
     </fragment>
     <fragment
         android:id="@+id/infoFragment"
-        android:name="com.example.newsapp.presentation.ui.InfoFragment"
+        android:name="com.example.newsapp.presentation.ui.FavoritesFragment"
         android:label="fragment_info"
         tools:layout="@layout/fragment_info" >
         <action

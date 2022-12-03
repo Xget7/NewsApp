@@ -8,6 +8,7 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.platform.ComposeView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
+import androidx.navigation.NavHostController
 
 import com.example.newsapp.R
 import com.example.newsapp.presentation.screens.SearchScreen
@@ -23,9 +24,11 @@ class SearchFragment : Fragment() {
     ): View {
         val view = ComposeView(requireContext())
         val viewModel = ViewModelProvider(requireActivity())[SearchNewsViewModel::class.java]
+        val navController = NavHostController(requireContext())
+
         view.apply {
             setContent {
-                SearchScreen(viewModel)
+                SearchScreen(viewModel,navController)
             }
         }
 

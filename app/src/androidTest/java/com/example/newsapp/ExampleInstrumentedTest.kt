@@ -1,8 +1,7 @@
 package com.example.newsapp
 
-import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.example.newsapp.data.network.NewsApiClient.newsApi
+import com.example.newsapp.data.network.api.NewsApiClient.newsApi
 import kotlinx.coroutines.runBlocking
 
 import org.junit.Test
